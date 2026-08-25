@@ -22,7 +22,7 @@ type Event = {
   event_date: string;
   event_time: string;
   poster_url: string | null;
-  certificate: string | null;
+  certificate_drive_link: string | null;
 };
 
 export default function StudentProfilePage() {
@@ -552,9 +552,9 @@ export default function StudentProfilePage() {
                     </p>
 
                   </div>
-{event.certificate && (
+{event.certificate_drive_link && (
   <a
-    href={event.certificate}
+    href={event.certificate_drive_link}
     target="_blank"
     rel="noopener noreferrer"
     onClick={(e) => e.stopPropagation()}
