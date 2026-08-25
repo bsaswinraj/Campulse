@@ -13,23 +13,39 @@ type StudentProfile = {
   linkedin_url: string | null;
 };
 
-export default function StudentProfile() {
+type Event = {
+  id: string;
+  event_name: string;
+  description: string;
+  venue: string;
+  resource_person: string | null;
+  event_date: string;
+  event_time: string;
+  poster_url: string | null;
+  certificate: string | null;
+};
+
+export default function StudentProfilePage() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
+
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [pastEvents, setPastEvents] = useState<Event[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(true);
+
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadStudentProfile() {
       try {
-        // Get currently logged-in user
+        // =========================
+        // GET CURRENT USER
+        // =========================
+
         const {
           data: { user },
-          error: userError,
         } = await supabase.auth.getUser();
-
-        if (userError) {
-          throw userError;
-        }
 
         if (!user) {
           setErrorMessage("You are not logged in.");
@@ -37,7 +53,10 @@ export default function StudentProfile() {
           return;
         }
 
-        // Get student profile
+        // =========================
+        // LOAD STUDENT PROFILE
+        // =========================
+
         const { data, error } = await supabase
           .from("student_profiles")
           .select(
@@ -54,6 +73,94 @@ export default function StudentProfile() {
         }
 
         setProfile(data);
+
+        // =========================
+        // LOAD REGISTRATIONS
+        // =========================
+
+        const { data: registrations, error: registrationError } =
+          await supabase
+            .from("event_registrations")
+            .select("event_id, registered_at")
+            .eq("student_id", user.id)
+            .order("registered_at", {
+              ascending: false,
+            });
+
+        if (registrationError) {
+          console.error(registrationError);
+          setEventsLoading(false);
+          setLoading(false);
+          return;
+        }
+
+        // No registered events
+        if (!registrations || registrations.length === 0) {
+          setUpcomingEvents([]);
+          setPastEvents([]);
+          setEventsLoading(false);
+          setLoading(false);
+          return;
+        }
+
+        // =========================
+        // GET EVENT IDS
+        // =========================
+
+        const eventIds = registrations.map(
+          (registration) => registration.event_id
+        );
+
+        // =========================
+        // LOAD EVENTS
+        // =========================
+
+        const { data: events, error: eventsError } = await supabase
+          .from("events")
+          .select(
+            `
+            id,
+            event_name,
+            description,
+            venue,
+            resource_person,
+            event_date,
+            event_time,
+            poster_url
+            `
+          )
+          .in("id", eventIds)
+          .order("event_date", {
+            ascending: true,
+          });
+
+        if (eventsError) {
+          console.error(eventsError);
+          setEventsLoading(false);
+          setLoading(false);
+          return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const upcoming: Event[] = [];
+        const past: Event[] = [];
+
+        (events || []).forEach((event) => {
+          const eventDate = new Date(
+            `${event.event_date}T00:00:00`
+          );
+
+          if (eventDate >= today) {
+            upcoming.push(event);
+          } else {
+            past.push(event);
+          }
+        });
+
+        setUpcomingEvents(upcoming);
+        setPastEvents(past);
       } catch (error) {
         console.error(error);
         setErrorMessage(
@@ -61,6 +168,7 @@ export default function StudentProfile() {
         );
       }
 
+      setEventsLoading(false);
       setLoading(false);
     }
 
@@ -73,7 +181,7 @@ export default function StudentProfile() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
 
@@ -91,8 +199,9 @@ export default function StudentProfile() {
 
   if (errorMessage || !profile) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
         <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
+
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl text-red-500">
             !
           </div>
@@ -109,26 +218,25 @@ export default function StudentProfile() {
             onClick={() => {
               window.location.href = "/";
             }}
-            className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700"
+            className="mt-6 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700"
           >
             Back to Calendar
           </button>
+
         </div>
       </main>
     );
   }
 
-  // =========================
-  // STUDENT PROFILE
-  // =========================
-
   return (
     <main className="min-h-screen bg-slate-50">
 
-      {/* ================= HEADER ================= */}
+      {/* =========================
+          HEADER
+      ========================= */}
 
       <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mx-auto max-w-7xl px-6 py-7">
 
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
 
@@ -138,9 +246,9 @@ export default function StudentProfile() {
 
               {/* Profile placeholder */}
 
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-blue-50 border-2 border-dashed border-blue-200">
-                <span className="text-2xl">
-                  👤
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50">
+                <span className="text-xs font-medium text-blue-400">
+                  PROFILE
                 </span>
               </div>
 
@@ -154,22 +262,19 @@ export default function StudentProfile() {
                 </h1>
 
                 <p className="mt-1 text-sm text-gray-500">
-                  {profile.department} • Semester{" "}
-                  {profile.semester}
+                  {profile.department} • Semester {profile.semester}
                 </p>
               </div>
 
             </div>
 
-            {/* Calendar button */}
-
             <button
               onClick={() => {
                 window.location.href = "/";
               }}
-              className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+              className="rounded-xl border border-gray-200 bg-white px-6 py-3 font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
             >
-              📅 Calendar
+              ← Calendar
             </button>
 
           </div>
@@ -177,17 +282,21 @@ export default function StudentProfile() {
         </div>
       </header>
 
-      {/* ================= MAIN ================= */}
+      {/* =========================
+          MAIN
+      ========================= */}
 
       <section className="mx-auto max-w-7xl px-6 py-8">
 
-        {/* ================= PERSONAL INFORMATION ================= */}
+        {/* =========================
+            PERSONAL DETAILS
+        ========================= */}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
 
           <div className="mb-5">
             <h2 className="text-xl font-bold text-gray-900">
-              Personal Information
+              Personal Details
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
@@ -197,19 +306,15 @@ export default function StudentProfile() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-            {/* Name */}
-
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Name
+                Full Name
               </p>
 
               <p className="mt-2 font-semibold text-gray-900">
                 {profile.full_name}
               </p>
             </div>
-
-            {/* Department */}
 
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -221,8 +326,6 @@ export default function StudentProfile() {
               </p>
             </div>
 
-            {/* Semester */}
-
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Semester
@@ -232,8 +335,6 @@ export default function StudentProfile() {
                 Semester {profile.semester}
               </p>
             </div>
-
-            {/* Phone */}
 
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -247,143 +348,231 @@ export default function StudentProfile() {
 
           </div>
 
-          {/* Email */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
 
-          <div className="mt-4 rounded-xl bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Email
-            </p>
-
-            <p className="mt-2 font-semibold text-gray-900">
-              {profile.email}
-            </p>
-          </div>
-
-          {/* LinkedIn */}
-
-          {profile.linkedin_url && (
-            <div className="mt-4 rounded-xl bg-slate-50 p-4">
+            <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                LinkedIn
+                Email
               </p>
 
-              <a
-                href={profile.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 block font-semibold text-blue-600 hover:underline"
-              >
-                View LinkedIn Profile →
-              </a>
+              <p className="mt-2 font-semibold text-gray-900">
+                {profile.email}
+              </p>
             </div>
-          )}
+
+            {profile.linkedin_url && (
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  LinkedIn
+                </p>
+
+                <a
+                  href={profile.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 block truncate font-semibold text-blue-600 hover:underline"
+                >
+                  {profile.linkedin_url}
+                </a>
+              </div>
+            )}
+
+          </div>
 
         </section>
 
-        {/* ================= REGISTERED EVENTS ================= */}
+        {/* =========================
+            UPCOMING EVENTS
+        ========================= */}
 
         <section className="mt-8">
 
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              My Events
+              My Upcoming Events
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
-              Your registered events will appear here.
+              Events you have saved through CAMPULSE.
             </p>
           </div>
 
-          {/* Upcoming event placeholder */}
+          {eventsLoading ? (
+            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <p className="text-sm text-gray-400">
+                Loading events...
+              </p>
+            </div>
+          ) : upcomingEvents.length === 0 ? (
+            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <div className="text-center">
 
-          <div className="mt-5 rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-2xl">
+                  📅
+                </div>
 
-            <div className="flex items-center gap-4">
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-xl">
-                ⏳
-              </div>
-
-              <div>
-                <h3 className="font-bold text-gray-800">
-                  Upcoming Event
-                </h3>
+                <p className="mt-4 font-semibold text-gray-700">
+                  No upcoming events
+                </p>
 
                 <p className="mt-1 text-sm text-gray-400">
-                  Your next registered event will appear here.
+                  Events you register for will appear here.
                 </p>
+
               </div>
+            </div>
+          ) : (
+            <div className="mt-5 flex gap-5 overflow-x-auto pb-4">
+
+              {upcomingEvents.map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  onClick={() => {
+                    window.location.href = `/event/${event.id}`;
+                  }}
+                  className="w-[280px] shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                >
+
+                  {event.poster_url ? (
+                    <img
+                      src={event.poster_url}
+                      alt={event.event_name}
+                      className="h-40 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-40 items-center justify-center bg-blue-50 text-sm text-blue-400">
+                      No Poster
+                    </div>
+                  )}
+
+                  <div className="p-4">
+
+                    <h3 className="line-clamp-2 font-bold text-gray-900">
+                      {event.event_name}
+                    </h3>
+
+                    <p className="mt-2 text-sm font-medium text-blue-600">
+                      {event.event_date}
+                    </p>
+
+                    <p className="mt-1 text-sm text-gray-500">
+                      {event.event_time}
+                    </p>
+
+                    <p className="mt-1 truncate text-sm text-gray-500">
+                      📍 {event.venue}
+                    </p>
+
+                  </div>
+
+                </button>
+              ))}
 
             </div>
+          )}
 
-          </div>
+        </section>
 
-          {/* Past events */}
+        {/* =========================
+            PAST EVENTS
+        ========================= */}
 
-          <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <section className="mt-8 pb-12">
 
-            <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold text-gray-900">
+            Past Events
+          </h2>
 
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-xl">
-                🗂️
-              </div>
+          <p className="mt-1 text-sm text-gray-500">
+            Events you previously saved on CAMPULSE.
+          </p>
 
-              <div>
-                <h3 className="font-bold text-gray-700">
-                  Past Events
-                </h3>
+          {eventsLoading ? (
+            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <p className="text-sm text-gray-400">
+                Loading events...
+              </p>
+            </div>
+          ) : pastEvents.length === 0 ? (
+            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <div className="text-center">
+
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-2xl">
+                  🗂️
+                </div>
+
+                <p className="mt-4 font-semibold text-gray-700">
+                  No past events
+                </p>
 
                 <p className="mt-1 text-sm text-gray-400">
                   Your completed events will appear here.
                 </p>
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        {/* ================= CERTIFICATES ================= */}
-
-        <section className="mt-8 pb-12">
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-xl">
-                  📜
-                </div>
-
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Certificates
-                  </h2>
-
-                  <p className="mt-1 text-sm text-gray-500">
-                    Your event certificates will appear here.
-                  </p>
-                </div>
 
               </div>
+            </div>
+          ) : (
+            <div className="mt-5 flex gap-5 overflow-x-auto pb-4">
 
-              <button
-                type="button"
-                className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-100"
-              >
-                View Certificates
-              </button>
+              {pastEvents.map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  onClick={() => {
+                    window.location.href = `/event/${event.id}`;
+                  }}
+                  className="w-[280px] shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left opacity-55 grayscale transition hover:opacity-70"
+                >
+
+                  {event.poster_url ? (
+                    <img
+                      src={event.poster_url}
+                      alt={event.event_name}
+                      className="h-40 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-40 items-center justify-center bg-gray-100 text-sm text-gray-400">
+                      No Poster
+                    </div>
+                  )}
+
+                  <div className="p-4">
+
+                    <h3 className="line-clamp-2 font-bold text-gray-800">
+                      {event.event_name}
+                    </h3>
+
+                    <p className="mt-2 text-sm text-gray-500">
+                      {event.event_date}
+                    </p>
+
+                    <p className="mt-1 text-sm text-gray-400">
+                      📍 {event.venue}
+                    </p>
+
+                  </div>
+{event.certificate && (
+  <a
+    href={event.certificate}
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()}
+    className="mt-3 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+  >
+    📜 View Certificate
+  </a>
+)}
+                </button>
+              ))}
 
             </div>
-
-          </div>
+          )}
 
         </section>
 
       </section>
+
     </main>
   );
 }

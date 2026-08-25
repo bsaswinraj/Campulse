@@ -14,6 +14,7 @@ export default function CreateEventPage() {
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [registrationLink, setRegistrationLink] = useState("");
+  const [certificateLink, setCertificateLink] = useState("");
   const [coordinators, setCoordinators] = useState("");
 
   // Poster
@@ -221,6 +222,7 @@ export default function CreateEventPage() {
           event_time: eventTime,
           registration_link:
             registrationLink.trim() || null,
+          certificate_drive_link: certificateLink.trim() || null,
           poster_url: publicUrl,
           coordinators: coordinators.trim() || null,
         });
@@ -470,6 +472,43 @@ export default function CreateEventPage() {
             />
 
           </div>
+          {/* ================= CERTIFICATE ================= */}
+
+<div className="mt-10">
+  <h2 className="text-xl font-bold text-gray-900">
+    Certificate
+  </h2>
+
+  <p className="mt-1 text-sm text-gray-500">
+    Add the Google Drive link containing certificates for participants.
+  </p>
+</div>
+
+<div className="mt-6">
+
+  <label className="mb-2 block text-sm font-semibold text-gray-700">
+    Certificate Drive Link
+    <span className="ml-1 font-normal text-gray-400">
+      (Optional)
+    </span>
+  </label>
+
+  <input
+    type="url"
+    value={certificateLink}
+    onChange={(e) =>
+      setCertificateLink(e.target.value)
+    }
+    placeholder="https://drive.google.com/..."
+    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  />
+
+  <p className="mt-2 text-xs text-gray-400">
+    Students who registered for this event will be able to access
+    this certificate link from their profile.
+  </p>
+
+</div>
 
           {/* ================= POSTER ================= */}
 
