@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useScrollScale } from "@/hooks/useScrollScale";
 
 type CommunityProfile = {
   id: string;
@@ -18,7 +19,7 @@ type Event = {
   event_name: string;
   description: string;
   venue: string;
-  resource_person: string;
+  resource_person: string | null;
   event_date: string;
   event_time: string;
   registration_link: string | null;
@@ -37,11 +38,12 @@ export default function CommunityPage() {
   const [eventsLoading, setEventsLoading] = useState(true);
 
   const [errorMessage, setErrorMessage] = useState("");
+
   const [deleteLoading, setDeleteLoading] =
     useState<string | null>(null);
 
   // =========================================================
-  // CERTIFICATE
+  // CERTIFICATE STATE
   // =========================================================
 
   const [certificateEventId, setCertificateEventId] =
@@ -52,6 +54,14 @@ export default function CommunityPage() {
 
   const [certificateSaving, setCertificateSaving] =
     useState<string | null>(null);
+
+  // =========================================================
+  // SCROLL EFFECT
+  // =========================================================
+
+  const detailsRef = useScrollScale<HTMLDivElement>();
+  const upcomingRef = useScrollScale<HTMLDivElement>();
+  const pastRef = useScrollScale<HTMLDivElement>();
 
   // =========================================================
   // LOAD PROFILE + EVENTS
@@ -71,9 +81,9 @@ export default function CommunityPage() {
           return;
         }
 
-        // -----------------------------------------------------
+        // =====================================================
         // LOAD COMMUNITY PROFILE
-        // -----------------------------------------------------
+        // =====================================================
 
         const {
           data: profileData,
@@ -99,9 +109,9 @@ export default function CommunityPage() {
         setProfile(profileData);
         setLoading(false);
 
-        // -----------------------------------------------------
+        // =====================================================
         // LOAD EVENTS
-        // -----------------------------------------------------
+        // =====================================================
 
         const {
           data: eventData,
@@ -110,19 +120,19 @@ export default function CommunityPage() {
           .from("events")
           .select(
             `
-            id,
-            community_id,
-            event_name,
-            description,
-            venue,
-            resource_person,
-            event_date,
-            event_time,
-            registration_link,
-            poster_url,
-            coordinators,
-            certificate_drive_link
-          `
+              id,
+              community_id,
+              event_name,
+              description,
+              venue,
+              resource_person,
+              event_date,
+              event_time,
+              registration_link,
+              poster_url,
+              coordinators,
+              certificate_drive_link
+            `
           )
           .eq("community_id", user.id)
           .order("event_date", {
@@ -217,9 +227,9 @@ export default function CommunityPage() {
         return;
       }
 
-      // -----------------------------------------------------
+      // =====================================================
       // VERIFY EVENT OWNERSHIP
-      // -----------------------------------------------------
+      // =====================================================
 
       const {
         data: eventData,
@@ -239,9 +249,9 @@ export default function CommunityPage() {
         return;
       }
 
-      // -----------------------------------------------------
+      // =====================================================
       // UPDATE CERTIFICATE DRIVE LINK
-      // -----------------------------------------------------
+      // =====================================================
 
       const { error: updateError } = await supabase
         .from("events")
@@ -258,9 +268,9 @@ export default function CommunityPage() {
         return;
       }
 
-      // -----------------------------------------------------
+      // =====================================================
       // UPDATE LOCAL STATE
-      // -----------------------------------------------------
+      // =====================================================
 
       setEvents((previousEvents) =>
         previousEvents.map((event) =>
@@ -278,11 +288,14 @@ export default function CommunityPage() {
       setCertificateLink("");
 
       alert(
-        "Certificate Drive link added successfully! 🎉"
+        "Certificate Drive link saved successfully! 🎉"
       );
     } catch (error) {
       console.error(error);
-      alert("Unable to save certificate Drive link.");
+
+      alert(
+        "Unable to save certificate Drive link."
+      );
     } finally {
       setCertificateSaving(null);
     }
@@ -294,11 +307,11 @@ export default function CommunityPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
 
-          <p className="font-medium text-gray-600">
+          <p className="font-medium text-slate-300">
             Loading your profile...
           </p>
         </div>
@@ -312,7 +325,7 @@ export default function CommunityPage() {
 
   if (errorMessage || !profile) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6">
         <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl text-red-500">
             !
@@ -326,6 +339,16 @@ export default function CommunityPage() {
             {errorMessage ||
               "Community profile not found."}
           </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "/";
+            }}
+            className="mt-6 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white transition hover:bg-blue-700"
+          >
+            Back to Calendar
+          </button>
         </div>
       </main>
     );
@@ -386,8 +409,8 @@ export default function CommunityPage() {
       : "Time not specified";
 
     return (
-      <article
-        className={`overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md ${
+      <div
+        className={`overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
           past ? "opacity-60" : ""
         }`}
       >
@@ -400,7 +423,7 @@ export default function CommunityPage() {
             <img
               src={event.poster_url}
               alt={event.event_name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover transition duration-500 hover:scale-105"
             />
           ) : (
             <div className="flex h-full items-center justify-center">
@@ -562,19 +585,15 @@ export default function CommunityPage() {
 
           {past && (
             <div className="mt-6 border-t border-gray-100 pt-5">
-
-              {/* -------------------------------------------------
+              {/* =================================================
                   CERTIFICATE ALREADY AVAILABLE
-              ------------------------------------------------- */}
+              ================================================= */}
 
               {event.certificate_drive_link &&
                 certificateEventId !== event.id && (
                   <div className="space-y-3">
-
                     <a
-                      href={
-                        event.certificate_drive_link
-                      }
+                      href={event.certificate_drive_link}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
@@ -585,118 +604,89 @@ export default function CommunityPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setCertificateEventId(
-                          event.id
-                        );
-
+                        setCertificateEventId(event.id);
                         setCertificateLink(
-                          event.certificate_drive_link ||
-                            ""
+                          event.certificate_drive_link || ""
                         );
                       }}
                       className="block w-full rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
                     >
-                      ✏️ Edit Certificate Drive Link
+                      Edit Certificate Drive Link
                     </button>
-
                   </div>
                 )}
 
-              {/* -------------------------------------------------
-                  NO CERTIFICATE LINK
-              ------------------------------------------------- */}
+              {/* =================================================
+                  NO CERTIFICATE YET
+              ================================================= */}
 
               {!event.certificate_drive_link &&
                 certificateEventId !== event.id && (
                   <button
                     type="button"
                     onClick={() => {
-                      setCertificateEventId(
-                        event.id
-                      );
-
+                      setCertificateEventId(event.id);
                       setCertificateLink("");
                     }}
-                    className="block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
+                    className="block w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-center text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
                   >
-                    📜 Add Certificate Drive Link
+                    + Add Certificate Drive Link
                   </button>
                 )}
 
-              {/* -------------------------------------------------
-                  CERTIFICATE EDITOR
-              ------------------------------------------------- */}
+              {/* =================================================
+                  CERTIFICATE FORM
+              ================================================= */}
 
               {certificateEventId === event.id && (
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-
-                  <p className="text-sm font-bold text-gray-900">
-                    {event.certificate_drive_link
-                      ? "Edit Certificate Drive Link"
-                      : "Add Certificate Drive Link"}
-                  </p>
-
-                  <p className="mt-1 text-xs text-gray-500">
-                    Add the Google Drive link containing
-                    the certificates for this event.
-                  </p>
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Certificate Drive Link
+                  </label>
 
                   <input
                     type="url"
                     value={certificateLink}
                     onChange={(e) =>
-                      setCertificateLink(
-                        e.target.value
-                      )
+                      setCertificateLink(e.target.value)
                     }
-                    placeholder="https://drive.google.com/..."
-                    className="mt-4 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Paste Google Drive certificate link"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
 
-                  <div className="mt-3 flex gap-3">
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        saveCertificateLink(event.id)
+                      }
+                      disabled={
+                        certificateSaving === event.id
+                      }
+                      className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {certificateSaving === event.id
+                        ? "Saving..."
+                        : "Save Link"}
+                    </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setCertificateEventId(
-                          null
-                        );
-
+                        setCertificateEventId(null);
                         setCertificateLink("");
                       }}
-                      className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
                     >
                       Cancel
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        saveCertificateLink(
-                          event.id
-                        )
-                      }
-                      disabled={
-                        certificateSaving ===
-                        event.id
-                      }
-                      className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {certificateSaving ===
-                      event.id
-                        ? "Saving..."
-                        : "Save Certificate"}
-                    </button>
-
                   </div>
                 </div>
               )}
-
             </div>
           )}
-
         </div>
-      </article>
+      </div>
     );
   }
 
@@ -705,20 +695,42 @@ export default function CommunityPage() {
   // =========================================================
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="relative min-h-screen overflow-hidden bg-slate-150">
+      {/* =====================================================
+          BACKGROUND IMAGE
+      ===================================================== */}
+
+      <div
+        className="fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage:
+            "url('/profile-background.jpg')",
+        }}
+      />
+
+      {/* =====================================================
+          DARK OVERLAY
+      ===================================================== */}
+
+      <div className="fixed inset-0 -z-10 bg-slate-950/65" />
+
+      {/* =====================================================
+          BLUE ATMOSPHERIC GLOW
+      ===================================================== */}
+
+      <div className="pointer-events-none fixed left-1/2 top-1/3 -z-10 h-[600px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600/20 blur-[140px]" />
 
       {/* =====================================================
           HEADER
       ===================================================== */}
 
-      <header className="border-b border-gray-200 bg-white">
+      <header className="relative border-b border-white/10 bg-white/85 shadow-sm backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-6 py-7">
-
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            {/* COMMUNITY INFORMATION */}
 
             <div className="flex items-center gap-5">
-
-              {/* LOGO */}
+              {/* LOGO PLACEHOLDER */}
 
               <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50">
                 <span className="text-xs font-medium text-blue-400">
@@ -735,7 +747,6 @@ export default function CommunityPage() {
                   {profile.community_name}
                 </h1>
               </div>
-
             </div>
 
             {/* CREATE EVENT */}
@@ -750,24 +761,23 @@ export default function CommunityPage() {
             >
               + Create Event
             </button>
-
           </div>
-
         </div>
       </header>
 
       {/* =====================================================
-          MAIN
+          MAIN CONTENT
       ===================================================== */}
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-
+      <section className="relative mx-auto max-w-7xl px-6 py-10">
         {/* ===================================================
             COMMUNITY DETAILS
         =================================================== */}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-
+        <section
+          ref={detailsRef}
+          className="will-change-transform rounded-3xl border border-white/40 bg-white/90 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-[transform,opacity] duration-150 ease-out"
+        >
           <div className="mb-5">
             <h2 className="text-xl font-bold text-gray-900">
               Community Details
@@ -780,6 +790,7 @@ export default function CommunityPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* COMMUNITY */}
 
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -791,6 +802,8 @@ export default function CommunityPage() {
               </p>
             </div>
 
+            {/* CONVENER */}
+
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Convener
@@ -800,6 +813,8 @@ export default function CommunityPage() {
                 {profile.convener_name}
               </p>
             </div>
+
+            {/* FACULTY COORDINATOR */}
 
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -811,6 +826,8 @@ export default function CommunityPage() {
               </p>
             </div>
 
+            {/* PHONE */}
+
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Phone
@@ -820,8 +837,9 @@ export default function CommunityPage() {
                 {profile.phone}
               </p>
             </div>
-
           </div>
+
+          {/* EMAIL */}
 
           <div className="mt-4 rounded-xl bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -832,41 +850,42 @@ export default function CommunityPage() {
               {profile.email}
             </p>
           </div>
-
         </section>
 
         {/* ===================================================
             UPCOMING EVENTS
         =================================================== */}
 
-        <section className="mt-10">
-
+        <section
+          ref={upcomingRef}
+          className="will-change-transform mt-10 rounded-3xl transition-[transform,opacity] duration-150 ease-out"
+        >
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-white drop-shadow-sm">
               Upcoming Events
             </h2>
 
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-slate-200">
               Events hosted by your community that are yet
               to happen.
             </p>
           </div>
 
-          {eventsLoading ? (
-            <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-10 text-center">
+          {/* LOADING */}
 
+          {eventsLoading ? (
+            <div className="mt-5 rounded-2xl border border-white/40 bg-white/90 p-10 text-center shadow-xl backdrop-blur-xl">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
 
               <p className="mt-3 text-sm text-gray-500">
                 Loading events...
               </p>
-
             </div>
           ) : upcomingEvents.length === 0 ? (
-            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+            /* EMPTY STATE */
 
+            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-white/40 bg-white/90 shadow-xl backdrop-blur-xl">
               <div className="text-center">
-
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-2xl">
                   📅
                 </div>
@@ -878,46 +897,51 @@ export default function CommunityPage() {
                 <p className="mt-1 text-sm text-gray-400">
                   Create your first event to see it here.
                 </p>
-
               </div>
-
             </div>
           ) : (
-            <div className="mt-5 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            /* EVENT GRID */
 
+            <div className="mt-5 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {upcomingEvents.map((event) => (
                 <EventCard
                   key={event.id}
                   event={event}
                 />
               ))}
-
             </div>
           )}
-
         </section>
 
         {/* ===================================================
             PAST EVENTS
         =================================================== */}
 
-        <section className="mt-12 pb-12">
-
+        <section
+          ref={pastRef}
+          className="will-change-transform mt-12 rounded-3xl pb-12 transition-[transform,opacity] duration-150 ease-out"
+        >
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-white drop-shadow-sm">
               Past Events
             </h2>
 
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-slate-200">
               Previously hosted events by your community.
             </p>
           </div>
 
-          {eventsLoading ? null : pastEvents.length === 0 ? (
-            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+          {eventsLoading ? (
+            <div className="mt-5 rounded-2xl border border-white/40 bg-white/90 p-10 text-center shadow-xl backdrop-blur-xl">
+              <p className="text-sm text-gray-500">
+                Loading past events...
+              </p>
+            </div>
+          ) : pastEvents.length === 0 ? (
+            /* EMPTY STATE */
 
+            <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl border border-white/40 bg-white/90 shadow-xl backdrop-blur-xl">
               <div className="text-center">
-
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-2xl">
                   🗂️
                 </div>
@@ -929,13 +953,12 @@ export default function CommunityPage() {
                 <p className="mt-1 text-sm text-gray-400">
                   Your completed events will appear here.
                 </p>
-
               </div>
-
             </div>
           ) : (
-            <div className="mt-5 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            /* EVENT GRID */
 
+            <div className="mt-5 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {pastEvents.map((event) => (
                 <EventCard
                   key={event.id}
@@ -943,12 +966,9 @@ export default function CommunityPage() {
                   past
                 />
               ))}
-
             </div>
           )}
-
         </section>
-
       </section>
     </main>
   );
