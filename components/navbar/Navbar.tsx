@@ -12,124 +12,192 @@ export default function Navbar() {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
 
-  // =========================
-  // CHECK CURRENT SESSION
-  // =========================
+  // =========================================================
+  // GET USER ROLE
+  // =========================================================
 
-  useEffect(() => {
-    async function loadSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+  async function loadUserRole(userId: string) {
+    try {
+      // -------------------------------------------------------
+      // FIRST: CHECK STUDENT PROFILE
+      // -------------------------------------------------------
 
-      if (session?.user) {
-        await loadUserRole(session.user.id);
-      } else {
-        setUserRole(null);
+      const { data: studentData, error: studentError } =
+        await supabase
+          .from("student_profiles")
+          .select("id")
+          .eq("id", userId)
+          .maybeSingle();
+
+      if (studentError) {
+        console.error(
+          "Error checking student profile:",
+          studentError
+        );
       }
 
-      setLoading(false);
+      if (studentData) {
+        setUserRole("student");
+        return;
+      }
+
+      // -------------------------------------------------------
+      // SECOND: CHECK COMMUNITY PROFILE
+      // -------------------------------------------------------
+
+      const { data: communityData, error: communityError } =
+        await supabase
+          .from("community_profiles")
+          .select("id")
+          .eq("id", userId)
+          .maybeSingle();
+
+      if (communityError) {
+        console.error(
+          "Error checking community profile:",
+          communityError
+        );
+      }
+
+      if (communityData) {
+        setUserRole("community");
+        return;
+      }
+
+      // -------------------------------------------------------
+      // NO PROFILE FOUND
+      // -------------------------------------------------------
+
+      setUserRole(null);
+    } catch (error) {
+      console.error("Unable to determine user role:", error);
+      setUserRole(null);
     }
+  }
 
-    loadSession();
+  // =========================================================
+  // CHECK CURRENT SESSION
+  // =========================================================
 
-    // =========================
-    // LISTEN FOR AUTH CHANGES
-    // =========================
+  useEffect(() => {
+    let mounted = true;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+    async function loadSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
         if (session?.user) {
           await loadUserRole(session.user.id);
         } else {
           setUserRole(null);
         }
+      } catch (error) {
+        console.error("Unable to load session:", error);
 
-        setLoading(false);
+        if (mounted) {
+          setUserRole(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadSession();
+
+    // =======================================================
+    // LISTEN FOR AUTH CHANGES
+    // =======================================================
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT") {
+          setUserRole(null);
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          // Delay database query slightly so Supabase can finish
+          // processing the authentication state.
+          setTimeout(() => {
+            if (mounted) {
+              loadUserRole(session.user.id).finally(() => {
+                if (mounted) {
+                  setLoading(false);
+                }
+              });
+            }
+          }, 0);
+        } else {
+          setUserRole(null);
+          setLoading(false);
+        }
       }
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
-  // =========================
-  // GET USER ROLE
-  // =========================
-
-  async function loadUserRole(userId: string) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Unable to load user role:", error);
-      setUserRole(null);
-      return;
-    }
-
-    if (
-      data?.role === "student" ||
-      data?.role === "community"
-    ) {
-      setUserRole(data.role);
-    } else {
-      setUserRole(null);
-    }
-  }
-
-  // =========================
+  // =========================================================
   // LOGOUT
-  // =========================
+  // =========================================================
 
   async function handleLogout() {
-    const { error } = await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
 
-    if (error) {
+      if (error) {
+        console.error("Logout failed:", error);
+        return;
+      }
+
+      setUserRole(null);
+
+      window.location.href = "/";
+    } catch (error) {
       console.error("Logout failed:", error);
-      return;
     }
-
-    setUserRole(null);
-
-    window.location.href = "/";
   }
 
-  // =========================
+  // =========================================================
   // PROFILE
-  // =========================
+  // =========================================================
 
   function handleProfile() {
     if (userRole === "student") {
       window.location.href = "/student";
+      return;
     }
 
     if (userRole === "community") {
       window.location.href = "/community";
+      return;
     }
   }
 
-  // =========================
-  // CALENDAR
-  // =========================
-
-  function handleCalendar() {
-    window.location.href = "/calendar";
-  }
+  // =========================================================
+  // RENDER
+  // =========================================================
 
   return (
     <>
       <nav className="w-full border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5">
 
-          {/* =========================
+          {/* =================================================
               LEFT SIDE
-          ========================= */}
+          ================================================= */}
 
           <div className="flex items-center gap-4">
 
@@ -141,6 +209,8 @@ export default function Navbar() {
               </span>
             </div>
 
+            {/* BRAND */}
+
             <div>
               <h1 className="text-3xl font-extrabold tracking-wide text-blue-700">
                 CAMPULSE
@@ -150,18 +220,17 @@ export default function Navbar() {
                 Unite the Separated
               </p>
             </div>
-
           </div>
 
-          {/* =========================
+          {/* =================================================
               RIGHT SIDE
-          ========================= */}
+          ================================================= */}
 
           <div className="flex items-center gap-3">
 
-            {/* =========================
+            {/* =================================================
                 LOGGED OUT
-            ========================= */}
+            ================================================= */}
 
             {!loading && userRole === null && (
               <>
@@ -187,14 +256,12 @@ export default function Navbar() {
               </>
             )}
 
-            {/* =========================
+            {/* =================================================
                 LOGGED IN
-            ========================= */}
+            ================================================= */}
 
             {!loading && userRole !== null && (
               <>
-              
-
                 {/* PROFILE */}
 
                 <button
@@ -216,15 +283,13 @@ export default function Navbar() {
                 </button>
               </>
             )}
-
           </div>
-
         </div>
       </nav>
 
-      {/* =========================
+      {/* =====================================================
           AUTH MODAL
-      ========================= */}
+      ===================================================== */}
 
       {authMode !== null && (
         <AuthModal
