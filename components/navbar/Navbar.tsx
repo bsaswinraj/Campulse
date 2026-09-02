@@ -203,11 +203,11 @@ export default function Navbar() {
 
             {/* LOGO PLACEHOLDER */}
 
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl border-2 border-dashed border-blue-300 bg-blue-50">
-              <span className="text-xs font-semibold text-blue-400">
-                Empty
-              </span>
-            </div>
+            <img
+  src="/campulse-logo.jpeg"
+  alt="CAMPULSE Logo"
+  className="h-14 w-14 object-contain"
+/>
 
             {/* BRAND */}
 
